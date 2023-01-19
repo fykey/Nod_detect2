@@ -84,8 +84,10 @@ for i = 0.01:0.01:1
     writematrix(S3,result_file,'WriteMode','append');
     writematrix(S4,result_file,'WriteMode','append');
     writematrix(S5,result_file,'WriteMode','append');
+  
 
     movefile(result_file, "./SVMfile3");
 
     learning_weight = 1 - i;
+    disp(i*100 + 1);
 end
