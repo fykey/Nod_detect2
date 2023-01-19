@@ -1,6 +1,6 @@
 clear
 flag = true;
-count = 0;
+countf = 0;
 
 % dataset make
 csvname = "";
@@ -15,16 +15,16 @@ while(flag)
     fm = csvread(strcat(path, file), 0, 1);
     fm_Y = fm(:, 1);
     fm_X = fm(:, 2:end);
-    if(count == 0)
+    if(countf == 0)
         X = fm_X;
         Y = fm_Y;
-        count = count + 1;
+        countf = countf + 1;
         continue
     end
 
     X = cat(1, X, fm_X);
     Y = cat(1, Y, fm_Y);
-    count = count + 1;
+    countf = countf + 1;
 
 end
 %{
@@ -84,6 +84,7 @@ for i = 0.01:0.01:1
     writematrix(S3,result_file,'WriteMode','append');
     writematrix(S4,result_file,'WriteMode','append');
     writematrix(S5,result_file,'WriteMode','append');
+    mkdir("./SVMfile3");
 
     movefile(result_file, "./SVMfile3");
 
