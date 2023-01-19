@@ -89,4 +89,5 @@ for i = 0.01:0.01:1
     movefile(result_file, "./SVMfile3");
 
     learning_weight = 1 - i;
+    disp(i*100 + 1);
 end
