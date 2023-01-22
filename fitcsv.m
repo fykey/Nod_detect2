@@ -41,7 +41,7 @@ len_Y0 = length(Y_index0);
 diff_lenY = len_Y0 - len_Y1;
 learning_weight = 1; % default 1, 
 
-for i = 0.01:0.01:1
+for i = 0.05:0.05:1
     frame = len_Y1 + round(diff_lenY * (1-learning_weight));
     Y_index00 = randsample(Y_index0, frame);
     
@@ -66,8 +66,9 @@ for i = 0.01:0.01:1
     %classLoss = kfoldLoss(CVSVMModel);
     d = datestr(now, 'yyyy-mm-dd_HH-MM-ss');
     
+    mkdir("./SVMfile4");
     matfilename = strcat(d, "_", function_name, "_.mat");
-    save(fullfile( "./SVMfile3", matfilename), "SVMModel");
+    save(fullfile( "./SVMfile3[4", matfilename), "SVMModel");
     
     % 
     
@@ -84,9 +85,9 @@ for i = 0.01:0.01:1
     writematrix(S3,result_file,'WriteMode','append');
     writematrix(S4,result_file,'WriteMode','append');
     writematrix(S5,result_file,'WriteMode','append');
-    mkdir("./SVMfile3");
+   
 
-    movefile(result_file, "./SVMfile3");
+    movefile(result_file, "./SVMfile4");
 
     learning_weight = 1 - i;
     disp(i*100 + 1);

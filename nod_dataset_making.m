@@ -116,9 +116,10 @@ nodtiming = readmatrix(strcat(name, "_nodtiming.xlsx"));
 nod_bool = zeros(length(time_stamps), 1);
 for u = 1:length(time_stamps)
     for s = 1:row
-        if nodtiming(s, 2) < time_stamps(u, 1) && time_stamps(u, 1) < nodtiming(s, 3)
+        if nodtiming(s, 1) < time_stamps(u, 1) && time_stamps(u, 1) < nodtiming(s, 2)
             %nod_bool(u-14, 1) = nodtiming(s, 1);
             nod_bool(u, 1) = 1;
+            continue;
         end
     end
 end

@@ -109,15 +109,14 @@ for k = 1:length(list)
     countK(k, 1) = k;
 
     nodAcc_timing(k, 1) = count_nod/length(span_v2);
+    nodAcc_count1(k, 1) = count4 / length(find(fm_Y == 1));
 
     filearray(k, 1) = string(filename);
 
-
     disp(k);
 
-
 end
-alldata = num2cell(cat(2, countK, nodAcc_frame, nodAcc_timing));
+alldata = num2cell(cat(2, countK, nodAcc_frame,nodAcc_count1, nodAcc_timing));
 
 A = cat(2, filearray, alldata);
 
