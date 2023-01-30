@@ -3,10 +3,14 @@ clear
 skip = 3;   %スキップ幅(default 1)
 dT  = 30;
 
-[file,path] = uigetfile('*.csv');   %choose movie
+path = uigetdir(pwd);
+list = dir(fullfile(path, "*.csv"));
+for num = 1:length(list)
 
-f = 4.0;%焦点距離 https://support.logi.com/hc/ja/articles/360053005413-C505-StreamCam-Technical-Specifications
+%[file,path] = uigetfile('*.csv');   %choose movie
+file = list(num).name;
 csv_file = fullfile(path,file);
+disp(csv_file);
 in_file = csv_file;
 confidences_threshold = 0;
 % Where to store the output
@@ -99,16 +103,16 @@ time_stamps = time_stamps - time_stamps((fpsper2+1)/2, 1);
 
 fps_h = (fpsper2+1)/2;
 pose_tx = pose_tx(fps_h:end-fpsper2, 1);
-pose_ty = pose_ty(fps_h:end-fpsper2, 1);
-pose_tz = pose_tz(fps_h:end-fpsper2, 1);
-pose_rx = pose_rx(fps_h:end-fpsper2, 1);
-pose_ry = pose_ry(fps_h:end-fpsper2, 1);
-pose_rz = pose_rz(fps_h:end-fpsper2, 1);
+pose_ty = (pose_ty(fps_h:end-fpsper2, 1));
+pose_tz = (pose_tz(fps_h:end-fpsper2, 1));
+pose_rx = (pose_rx(fps_h:end-fpsper2, 1));
+pose_ry = (pose_ry(fps_h:end-fpsper2, 1));
+pose_rz = (pose_rz(fps_h:end-fpsper2, 1));
 time_stamps = time_stamps(fps_h:end-fpsper2, 1);
 
 %length(time_stamps) >> length(time_stamps) - (fpsper2 - 1)
 
-frame_sum = sum(logical(time_stamps));
+data_length = length(pose_rx);
 
 nodtiming = readmatrix(strcat(name, "_nodtiming.xlsx"));
 
@@ -119,174 +123,143 @@ for u = 1:length(time_stamps)
         if nodtiming(s, 1) < time_stamps(u, 1) && time_stamps(u, 1) < nodtiming(s, 2)
             %nod_bool(u-14, 1) = nodtiming(s, 1);
             nod_bool(u, 1) = 1;
-            continue;
         end
     end
 end
 
+countI = 0;
+AngleNum = 2*dT/skip+1;
+fm = (zeros(data_length-2*dT,(dT/skip+1)*3+2));
+fm_A = zeros(data_length-2*dT,(2*dT/skip+1)*3);
 
+w = (gausswin(AngleNum));
+prev_d = 0;
+% calculate relative eul angle
+alpha_12 = zeros(1, 2*dT/skip+1);
+beta_12 = zeros(1, 2*dT/skip+1);
+gamma_12 = zeros(1, 2*dT/skip+1);
 
-Rt1t2 = zeros(3,3,length(time_stamps)-skip);     %relative rotate(3*3*num of using data)
-Tt1t2 = zeros(3,1,length(time_stamps)-skip);     %relative translate(3*3*num of using data)
-eul_3 = zeros(length(time_stamps)-skip, 3);
-
-fm = zeros(1,(dT+1)*3+2);
-count = 1;
-for i = 1:length(time_stamps)-skip
-    % calcurate relative rotate and translate matrix
+% gaussian window
+W_alpha_12 = zeros(1, 2*dT/skip+1);
+W_beta_12 = zeros(1, 2*dT/skip+1);
+W_gamma_12 = zeros(1, 2*dT/skip+1);
+for i = 1+dT:data_length-dT
+    if(rem(i, 100) == 0)
+        disp(i);
+    end
+    countI = countI + 1;
+    %% calcurate relative rotate matrix
     % X_t >> X_cへの変換のため、角度はすべてマイナスにする
     alpha_1 = -pose_rx(i);
-    alpha_2 = -pose_rx(i + skip);
-
     beta_1 = -pose_ry(i);
-    beta_2 = -pose_ry(i + skip);
-
     gamma_1 = -pose_rz(i);
-    gamma_2 = -pose_rz(i + skip);
 
     eul_1 = [gamma_1 beta_1 alpha_1];
-    eul_2 = [gamma_2 beta_2 alpha_2];
+    rot_1 = eul2rotm(eul_1);
+
+    t_1 = [pose_tx(i); pose_ty(i); pose_tz(i)]; %縦ベクトル
+    countJ = 0;
+    for j = -dT:skip:dT
     % eul angle >> rotate matrix
     % X_t >> X_c (3*3)
-    rot_1 = eul2rotm(eul_1);
+
+    countJ = countJ + 1;
+
+    alpha_2 = -pose_rx(i+j);
+    beta_2 = -pose_ry(i+j);
+    gamma_2 = -pose_rz(i+j);
+
+    eul_2 = [gamma_2 beta_2 alpha_2];
     rot_2 = eul2rotm(eul_2);
 
-    T_01 = [pose_tx(i); pose_ty(i); pose_tz(i)];
-    T_02 = [pose_tx(i+skip); pose_ty(i+skip); pose_tz(i+skip)];
-
-    I = [1 0 0; 0 -1 0; 0 0 -1];
-
-    T_w = [0; 0; 1000];
-    %X_f >>( X_c )>> X_w 
-    R_1 = I*rot_1;%3*3
-    T_1 = I*T_01 + T_w;%3*1
-
-    R_2 = I*rot_2;
-    T_2 = I*T_02 + T_w;
-    % relative rotate and translate matrix
-    Rt1t2(:,:,count) = R_1\R_2;
-    Tt1t2(:,:,count) =  R_1\(T_2 - T_1);
+    %calculate relative Rot and eul angle
+    Rot_12 = rot_1\rot_2;
+    eul_12 = rotm2eul(Rot_12);
     
-    %% calcurate eul angle from relative matrix(for Rotation axis features)
-    eul_3(count, :) = rotm2eul(Rt1t2(1:3, 1:3, count));
+    % calculate relative eul angle
+    alpha_12(1, countJ) = eul_12(1);
+    beta_12(1, countJ) = eul_12(2);
+    gamma_12(1, countJ) = eul_12(3);
+
+    % gaussian window
+    W_alpha_12(1, countJ) = alpha_12(1, countJ) * w(countJ, 1);
+    W_beta_12(1, countJ) = beta_12(1, countJ) * w(countJ, 1);
+    W_gamma_12(1, countJ) = gamma_12(1, countJ) * w(countJ, 1);
     
-    %% calcurate OP and d(for Head rotattion frequency features)
-    OP = lsqr((1.0001 * eye(3) - Rt1t2(:,:,count)), Tt1t2(:,:,count));
+    %% calculate Trans mat and D
+    t_2 = [pose_tx(i+j); pose_ty(i+j); pose_tz(i+j)];
+    Trans_12 =rot_1\(t_2 - t_1);
+    Rot_12 = Rot_12;
     
-    [V, lambda] = eig(Rt1t2(:,:,count));
+    [OP,flag,relres,iter,resvec] = lsqr((1.0001 * eye(3) - Rot_12), Trans_12);
+    [V, lambda] = eig(Rot_12);
+    
     % find the position of eigenvalue 1
     [row, col] = find(abs(lambda - 1) < 0.0001);
-    if ~isscalar(col)
+     if ~isscalar(col)
         %d(1, s) = 0 ;
-        disp("以上あり")
-        d(count, 1) = prev_d;
-        count = count + 1;
+        %disp("以上あり")
+        d(countJ, 1) = prev_d;
+        continue;
+     end
 
-        if i > 2*dT + skip  %
-        index_c = i - (dT+skip);  %center position
-        angle_z = zeros(1, dT*2+1);
-        angle_y = zeros(1, dT*2+1);
-        angle_x = zeros(1, dT*2+1);
-        d_list = zeros(1, dT*2+1);
-        w = gausswin(2*dT+1);
-
-        for j = -dT:dT
-            index_n = index_c + j; % now position
-            angle = eul_3(index_n, :);
-            angle_z(1, j+dT+1) = w(j+dT+1)*angle(1, 1);
-            angle_y(1, j+dT+1) = w(j+dT+1)*angle(1, 2);
-            angle_x(1, j+dT+1) = w(j+dT+1)*angle(1, 3);
-
-            d_list(1, j+dT+1) = d(index_n, 1);
-        end
-
-        fft_angle_z = fft(angle_z);
-        fft_angle_y = fft(angle_y);
-        fft_angle_x = fft(angle_x);
-
-        norm_angle_z = arrayfun(@(x) norm(x), fft_angle_z);
-        norm_angle_y = arrayfun(@(x) norm(x), fft_angle_y);
-        norm_angle_x = arrayfun(@(x) norm(x), fft_angle_x);
-%{
-        fm_rot = cat(2, norm_angle_x(1, dT+1:2*dT+1), ...
-            norm_angle_y(1, dT+1:2*dT+1), norm_angle_z(1, dT+1:2*dT+1));
-%}      
-        % fft-> [X(0), X(df), X(2df), ... , X(dT*df), X(-(dT-1)*df), ..., X(-df)]
-        fm_rot = cat(2, norm_angle_x(1, 1:dT+1), ...
-            norm_angle_y(1,1:dT+1), norm_angle_z(1, 1:dT+1));
-
-        fm_axis = cat(2, mean(d_list), max(d_list));
-        fm = cat(1, fm, cat(2, fm_rot, fm_axis));
+     u = V(:, col);% eigenvector of eigenvalue 1
+     theta = acos(dot(u, OP) / (norm(u) * norm(OP)));
+     d(countJ, 1) = norm(OP) * sin(theta);
+     prev_d = d(countJ, 1);
+     
+    
     end
 
-        continue
-    end
+    %% calculate f_Rot
+    Angle_12 = cat(2, alpha_12, beta_12, gamma_12);
+    W_Angle_12 = cat(2, W_alpha_12, W_beta_12, W_gamma_12);
 
-    u = V(:, col);% eigenvector of eigenvalue 1
-    theta = acos(dot(u, OP) / (norm(u) * norm(OP)));
+    FFT_alpha_12 = fft(W_alpha_12);
+    FFT_beta_12 = fft(W_beta_12);
+    FFT_gamma_12 = fft(W_gamma_12);
 
-    d(count, 1) = norm(OP) * sin(theta);
-    prev_d = d(count, 1);
-    count = count + 1;
-    %% process of making 2 features
-    if i > 2*dT + skip  %
-        index_c = i - (dT+skip);  %center position
-        angle_z = zeros(1, dT*2+1);
-        angle_y = zeros(1, dT*2+1);
-        angle_x = zeros(1, dT*2+1);
-        d_list = zeros(1, dT*2+1);
-        w = gausswin(2*dT+1);
+    FFT_angle_12 = cat(2, FFT_alpha_12, FFT_beta_12, FFT_gamma_12);
 
-        for j = -dT:dT
-            index_n = index_c + j; % now position
-            angle = eul_3(index_n, :);
-            angle_z(1, j+dT+1) = w(j+dT+1)*angle(1, 1);
-            angle_y(1, j+dT+1) = w(j+dT+1)*angle(1, 2);
-            angle_x(1, j+dT+1) = w(j+dT+1)*angle(1, 3);
+    norm_alpha_12 = arrayfun(@(x) norm(x), FFT_alpha_12);
+    norm_beta_12 = arrayfun(@(x) norm(x), FFT_beta_12);
+    norm_gamma_12 = arrayfun(@(x) norm(x), FFT_gamma_12);
 
-            d_list(1, j+dT+1) = d(index_n, 1);
-        end
+    f_Rot = cat(2, norm_alpha_12(1:dT/skip+1), norm_beta_12(1:dT/skip+1), norm_gamma_12(1:dT/skip+1));
+    
+    %% calculate f_Axis(M)
+    f_Axis = [mean(d) max(d)]/1000;
+    f = cat(2, f_Rot, f_Axis);
+    fm(countI, :) = f;
+    fm_A(countI, :) = Angle_12;
 
-        fft_angle_z = fft(angle_z);
-        fft_angle_y = fft(angle_y);
-        fft_angle_x = fft(angle_x);
-
-        norm_angle_z = arrayfun(@(x) norm(x), fft_angle_z);
-        norm_angle_y = arrayfun(@(x) norm(x), fft_angle_y);
-        norm_angle_x = arrayfun(@(x) norm(x), fft_angle_x);
-%{
-        fm_rot = cat(2, norm_angle_x(1, dT+1:2*dT+1), ...
-            norm_angle_y(1, dT+1:2*dT+1), norm_angle_z(1, dT+1:2*dT+1));
-%}      
-        % fft-> [X(0), X(df), X(2df), ... , X(dT*df), X(-(dT-1)*df), ..., X(-df)]
-        fm_rot = cat(2, norm_angle_x(1, 1:dT+1), ...
-            norm_angle_y(1,1:dT+1), norm_angle_z(1, 1:dT+1));
-
-        fm_axis = cat(2, mean(d_list), max(d_list));
-        fm = cat(1, fm, cat(2, fm_rot, fm_axis));
-    end
 end
+fm = gather(fm);
 
 %% dataset making
-time_stamps(1:dT, :) = [];
-time_stamps(end+1-(dT+2*skip):end, :) = [];
-
-nod_bool(1:dT, :) = [];
-nod_bool(end+1-(dT+2*skip):end, :) = [];
-
-fm(1, :) = [];
+fm_time = time_stamps(dT+1:end-dT, 1);
+nod_bool2 = nod_bool(dT+1:end-dT, 1);
 
 max_d = max(fm(:, end));
 fm(:, end-1:end) = fm(:, end-1:end)/max_d;
 
-fm = cat(2, time_stamps, nod_bool, fm);
+fmW = cat(2, fm_time, nod_bool2, fm);
+fm_A2 = cat(2, fm_time, nod_bool2, fm_A);
 
-dataset_name = strcat(name, "_dataset3.csv");
-writematrix(fm, dataset_name);
+dataset_name = strcat(name, "_dataset5", "_skip_", num2str(skip), ".csv");
+angle_name = strcat(name, "_RelativeAngle", "_skip_", num2str(skip), ".csv");
+writematrix(fmW, dataset_name);
+writematrix(fm_A2, angle_name);
 
-mkdir(output_dir, "dataset")
-movefile(dataset_name, strcat(output_dir, "/dataset/"))
+%writematrix(fm, fullfile(savefolder, strcat(name, "eur_angle.csv")));
+DirName_D = strcat("datasetZYX","_skip_", num2str(skip));
+DirName_A = strcat("AngleZYX","_skip_", num2str(skip));
 
+mkdir(output_dir,DirName_D);
+mkdir(output_dir, DirName_A);
 
+movefile(dataset_name, fullfile(output_dir,DirName_D));
+movefile(angle_name, fullfile(output_dir,DirName_A));
 
+end
 

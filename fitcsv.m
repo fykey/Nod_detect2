@@ -39,9 +39,9 @@ len_Y1 = length(Y_index1);
 Y_index0 = find(Y == 0);
 len_Y0 = length(Y_index0);
 diff_lenY = len_Y0 - len_Y1;
-learning_weight = 1; % default 1, 
+learning_weight = 0.95; % default 1, 
 
-for i = 0.05:0.05:1
+for i = 0.1:0.05:1
     frame = len_Y1 + round(diff_lenY * (1-learning_weight));
     Y_index00 = randsample(Y_index0, frame);
     
@@ -66,9 +66,9 @@ for i = 0.05:0.05:1
     %classLoss = kfoldLoss(CVSVMModel);
     d = datestr(now, 'yyyy-mm-dd_HH-MM-ss');
     
-    mkdir("./SVMfile4");
+    mkdir("./SVMfileAngle");
     matfilename = strcat(d, "_", function_name, "_.mat");
-    save(fullfile( "./SVMfile3[4", matfilename), "SVMModel");
+    save(fullfile( "./SVMfileAngle", matfilename), "SVMModel");
     
     % 
     
@@ -87,7 +87,7 @@ for i = 0.05:0.05:1
     writematrix(S5,result_file,'WriteMode','append');
    
 
-    movefile(result_file, "./SVMfile4");
+    movefile(result_file, "./SVMfileAngle");
 
     learning_weight = 1 - i;
     disp(i*100 + 1);

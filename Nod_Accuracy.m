@@ -1,7 +1,7 @@
 clear
 
-[file,  path] = uigetfile("*.mat");
-load(file)
+[fileM,  path] = uigetfile("*.mat");
+load(fileM)
 
 [file,  path] = uigetfile("*.csv");
 
@@ -18,34 +18,49 @@ count_h1 = 0;
 Y_pre2 = Y_pre;
 
 for i = 16:length(Y_pre)-15
-    sum = 0;
-    
-    if(Y_pre(i, 1) == 1)
-
-        for j = -15:15
-            sum = sum + Y_pre(i+j, 1);
+    if Y_pre(i, 1) ~= 1
+        CheckM = 0;
+        CheckP = 0;
+        for j = 1:15
+            if Y_pre(i+j, 1)
+                CheckP = CheckP + 1;
+            end
+            if Y_pre(i-j, 1)
+                CheckM = CheckM + 1;
+            end
         end
-        if sum<10
-            Y_pre2(i, 1) = 0;
-            count_h0 = count_h0 + 1;
-            continue
-
-        end
-
-    else
-        for j = -15:15
-            sum = sum + Y_pre(i+j, 1);
-        end
-        if sum>14
-            Y_pre2(i, 1) = 1;
-            count_h1 = count_h1 + 1;
-            continue
-
-        end
-
     end
-    
+
+        if (CheckM + CheckP) >= 20
+
+            Y_pre(i, 1) = 1;
+        end
+
 end
+
+for i = 16:length(Y_pre)-15
+    if Y_pre(i, 1) == 1
+        CheckM = 0;
+        CheckP = 0;
+        for j = 1:15
+            if Y_pre(i+j, 1) ~= 1
+                CheckP = CheckP + 1;
+            end
+            if Y_pre(i-j, 1) ~= 1
+                CheckM = CheckM + 1;
+            end
+        end
+    end
+
+        if (CheckM + CheckP) >= 20
+
+            Y_pre(i, 1) = 0;
+        end
+
+end
+
+
+
 
 
 count1 = 0;
