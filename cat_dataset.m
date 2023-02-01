@@ -36,4 +36,4 @@ X_extracted = fm_X(Y_index, :);
 dataset = cat(2, Y_extracted, X_extracted);
 
 
-csvwrite(fullfile(path, "dataset.csv"), Alldata);
+csvwrite(fullfile(path, "dataset.csv"), dataset);
